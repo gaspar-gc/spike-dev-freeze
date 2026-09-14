@@ -8,6 +8,7 @@ set -euo pipefail
 : "${REPOSITORY:?repository is required}"
 : "${BRANCH:?branch is required}"
 : "${GH_TOKEN:?a token with Administration:write on the repo is required}"
+: "${ACTOR:?actor is required}"
 
 RULESET_NAME="${RULESET_NAME:-branch-code-freeze}"
 BYPASS_USERS="${BYPASS_USERS:-}"
@@ -21,6 +22,38 @@ esac
 # --paginate: without it a repo with many rulesets hides ours and we create a duplicate.
 ruleset_id=$(gh api "repos/${REPOSITORY}/rulesets" --paginate \
   --jq ".[] | select(.name == \"${RULESET_NAME}\") | .id" | head -n1)
+
+# A freeze over a live freeze would replace bypass_actors and ref_name wholesale,
+# silently locking out whoever froze first or thawing the branch they froze. One
+# ruleset per repo cannot hold two freezes, so refuse instead of clobbering.
+if [ "$OPERATION" = freeze ] && [ -n "$ruleset_id" ]; then
+  # The list endpoint omits bypass_actors and conditions; only the detail one has them.
+  existing=$(gh api "repos/${REPOSITORY}/rulesets/${ruleset_id}")
+
+  if [ "$(jq -r '.enforcement' <<<"$existing")" = active ]; then
+    frozen_ref=$(jq -r '.conditions.ref_name.include[0] // ""' <<<"$existing")
+
+    if [ "$frozen_ref" != "refs/heads/${BRANCH}" ]; then
+      echo "::error::${RULESET_NAME} is already freezing ${frozen_ref}; unfreeze it before freezing ${BRANCH}" >&2
+      exit 1
+    fi
+
+    actor_id=$(gh api "users/${ACTOR}" --jq '.id') || {
+      echo "::error::no such GitHub user '${ACTOR}'" >&2; exit 1; }
+
+    if ! jq -e --argjson id "$actor_id" \
+      'any(.bypass_actors[]?; .actor_type == "User" and .actor_id == $id)' <<<"$existing" >/dev/null; then
+      owners=$(jq -r '[.bypass_actors[]? | select(.actor_type == "User") | .actor_id] | join(" ")' <<<"$existing")
+      for id in $owners; do
+        echo "::notice::${BRANCH} is frozen by $(gh api "user/${id}" --jq '.login' || echo "user id ${id}")"
+      done
+      echo "::error::${BRANCH} is already frozen and ${ACTOR} is not in its bypass list; ask one of the users above to unfreeze" >&2
+      exit 1
+    fi
+
+    echo "${BRANCH} is already frozen and ${ACTOR} is in the bypass list; refreshing it"
+  fi
+fi
 
 # BYPASS_USERS is a comma separated list of logins; empty entries are skipped so
 # callers can build it by concatenation without worrying about stray commas.

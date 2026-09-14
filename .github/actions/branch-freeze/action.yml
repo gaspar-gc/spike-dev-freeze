@@ -13,6 +13,10 @@ inputs:
     description: Branch to freeze or unfreeze
     required: true
     default: development
+  actor:
+    description: GitHub username running the operation; must hold a bypass to refreeze a frozen branch
+    required: false
+    default: ${{ github.actor }}
   bypass-users:
     description: Comma separated GitHub usernames allowed to push/merge during the freeze
     required: false
@@ -39,6 +43,7 @@ runs:
         OPERATION: ${{ inputs.operation }}
         REPOSITORY: ${{ inputs.repository }}
         BRANCH: ${{ inputs.branch }}
+        ACTOR: ${{ inputs.actor }}
         BYPASS_USERS: ${{ inputs['bypass-users'] }}
         RULESET_NAME: ${{ inputs['ruleset-name'] }}
         GH_TOKEN: ${{ inputs.token }}
