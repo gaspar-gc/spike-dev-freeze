@@ -1,0 +1,45 @@
+name: Branch freeze
+description: Freeze or unfreeze a branch using a repo-level GitHub ruleset.
+
+inputs:
+  operation:
+    description: freeze (apply the code freeze) or unfreeze (lift it)
+    required: true
+  repository:
+    description: Target repository in owner/name form
+    required: true
+    default: ${{ github.repository }}
+  branch:
+    description: Branch to freeze or unfreeze
+    required: true
+    default: development
+  bypass-users:
+    description: Comma separated GitHub usernames allowed to push/merge during the freeze
+    required: false
+    default: ''
+  ruleset-name:
+    description: Name of the ruleset to upsert
+    required: false
+    default: branch-code-freeze
+  token:
+    description: "Token with 'Administration: write' permission on the repository"
+    required: true
+
+outputs:
+  ruleset-id:
+    description: ID of the ruleset that was created, updated or disabled
+    value: ${{ steps.freeze.outputs.ruleset-id }}
+
+runs:
+  using: composite
+  steps:
+    - id: freeze
+      shell: bash
+      env:
+        OPERATION: ${{ inputs.operation }}
+        REPOSITORY: ${{ inputs.repository }}
+        BRANCH: ${{ inputs.branch }}
+        BYPASS_USERS: ${{ inputs['bypass-users'] }}
+        RULESET_NAME: ${{ inputs['ruleset-name'] }}
+        GH_TOKEN: ${{ inputs.token }}
+      run: ${{ github.action_path }}/src/freeze.sh

@@ -1,0 +1,39 @@
+name: Branch freeze
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: What to do
+        required: true
+        type: choice
+        options: [freeze, unfreeze]
+      branch:
+        description: Branch to freeze or unfreeze
+        required: true
+        default: development
+        type: string
+      bypass-user:
+        description: Extra GitHub username allowed to push and merge while frozen
+        required: false
+        default: ''
+        type: string
+
+# checkout needs contents:read; with an empty permissions block the
+# GITHUB_TOKEN cannot clone the repo and the job fails before the action runs.
+permissions:
+  contents: read
+
+jobs:
+  freeze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/branch-freeze
+        with:
+          operation: ${{ inputs.operation }}
+          branch: ${{ inputs.branch }}
+          # Whoever launched this workflow keeps merge access, plus anyone
+          # named explicitly in the bypass-user input.
+          bypass-users: ${{ github.actor }},${{ inputs['bypass-user'] }}
+          token: ${{ secrets.REPO_ADMIN_TOKEN }}
