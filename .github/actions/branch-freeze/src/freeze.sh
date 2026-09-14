@@ -44,6 +44,10 @@ if [ "$OPERATION" = freeze ] && [ -n "$ruleset_id" ]; then
     if ! jq -e --argjson id "$actor_id" \
       'any(.bypass_actors[]?; .actor_type == "User" and .actor_id == $id)' <<<"$existing" >/dev/null; then
       owners=$(jq -r '[.bypass_actors[]? | select(.actor_type == "User") | .actor_id] | join(" ")' <<<"$existing")
+      if [ -z "$owners" ]; then
+        echo "::error::${BRANCH} is already frozen with an empty bypass list; unfreeze it before freezing again" >&2
+        exit 1
+      fi
       for id in $owners; do
         echo "::notice::${BRANCH} is frozen by $(gh api "user/${id}" --jq '.login' || echo "user id ${id}")"
       done
