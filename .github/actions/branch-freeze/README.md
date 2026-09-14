@@ -37,6 +37,7 @@ Run it from the Actions tab via the **Branch freeze** workflow
 | `operation` | yes | — | `freeze` or `unfreeze` |
 | `repository` | yes | current repo | `owner/name` |
 | `branch` | yes | `development` | Branch to gate |
+| `actor` | no | `github.actor` | Who is running the operation. A `freeze` over an already active freeze is refused unless this user holds a bypass on it. |
 | `bypass-users` | no | — | Comma separated GitHub usernames allowed to push and merge during the freeze. Logins are resolved to numeric user ids by the action; empty entries and duplicates are ignored. Without it the freeze applies to everyone, including admins. |
 | `ruleset-name` | no | `branch-code-freeze` | One ruleset is reused per repo |
 | `token` | yes | — | See requirements |
@@ -53,3 +54,8 @@ Output: `ruleset-id`.
   keeps merge access without having to name themselves.
 - The `PUT` replaces the whole ruleset, so the bypass list has to be supplied on
   every freeze; it is not remembered from the previous run.
+- Freezing a branch that is already frozen is refused unless `actor` is in the
+  existing bypass list, and freezing a second branch while another one is frozen
+  is refused outright. One ruleset per repo cannot hold two freezes, and without
+  the guard the second run would silently take over the first one's bypass list
+  or thaw its branch. `unfreeze` is never gated, so a freeze can always be lifted.
